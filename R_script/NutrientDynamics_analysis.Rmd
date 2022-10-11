@@ -1,0 +1,441 @@
+---
+title: "NutrientDynamics_Markdown"
+author: "SEM"
+date: "11/OCT/2022"
+
+output: html_document
+
+---
+
+## citation: Shelby E. McIlroy, Casey P. terHorst, Mark Teece, Mary Alice Coffroth (2022) Nutrient dynamics in coral symbiosis depend on both the relative and absolute abundance of Symbiodiniaceae species. Microbiome  
+
+## Load Libraries
+
+```{r libraries, include=TRUE, echo=TRUE, message = FALSE, warning=FALSE}
+
+library(dplyr)
+library(ggplot2)
+library(interflex)
+library(wesanderson)
+library(car)
+library(knitr)
+
+```
+
+
+## Import data minor formats  
+
+### Filter File (FilterData.csv) and Stable Isotope Data by Filter (IsotopesByFilter.csv)
+
+
+```{r data import and format, include=TRUE, echo=TRUE}
+polyp_data<-read.csv("RecruitsByFilter.csv",header = T)
+realdata<-read.csv(file="IsotopesByFilter.csv",header = T)
+realdata$Filter<-as.character(realdata$Filter)
+```
+
+
+## Symbiont density and composition across recruits  
+
+### Spearman's test to check for a correlation between the density of symbionts within a recruit and the ratio of symbiont species
+
+
+```{r correlation, include=TRUE, echo=TRUE}
+SpT<-cor.test(polyp_data$NumTotal,polyp_data$PercentB, method="spearman",exact=FALSE)
+SpT
+```
+
+
+### Table of symbiont density and symbiont composition across filters subsequently used in SIA analyses
+
+
+```{r filtercalcs, include=TRUE, echo=FALSE, results = 'asis'}
+filt_meanT<-polyp_data %>% group_by(Filter) %>% summarise(avgTotal=mean(NumTotal))
+filt_meanB<-polyp_data %>% group_by(Filter) %>% summarise(avgB=mean(PercentB))
+filt_minT<-polyp_data %>% group_by(Filter) %>% summarise(minTotal=min(NumTotal))
+filt_minB<-polyp_data %>% group_by(Filter) %>% summarise(minB=min(PercentB))
+filt_maxT<-polyp_data %>% group_by(Filter) %>% summarise(maxTotal=max(NumTotal))
+filt_maxB<-polyp_data %>% group_by(Filter) %>% summarise(maxB=max(PercentB))
+byfilter<-left_join(filt_meanT,filt_meanB,by="Filter")
+byfilter<-left_join(byfilter,filt_minT,by="Filter")
+byfilter<-left_join(byfilter,filt_minB,by="Filter")
+byfilter<-left_join(byfilter,filt_maxT,by="Filter")
+byfilter<-left_join(byfilter,filt_maxB,by="Filter")
+byfilter$avgTotal<-byfilter$avgTotal*3.5
+byfilter$minTotal<-byfilter$minTotal*3.5
+byfilter$maxTotal<-byfilter$maxTotal*3.5
+byfilter_all<-byfilter
+#byfilter<-byfilter_all
+#byfilter
+#byfilter<-byfilter_rm
+controls<-c(102,103,104,108,140,142,150,152,153,154,155,157,159)
+byfilter_rm<-byfilter_all[!byfilter_all$Filter %in% controls,]
+
+byfilter<-byfilter_rm
+kable(byfilter)
+```
+
+
+### **Fig. 2.** Recruit combinations for SIA  
+#### To obtain enough mass, separated host or symbiont tissues from 8-10 recruits were combined onto a glass fibre filter prior to stable isotope analysis. Variation in the (A) relative ratio of symbionts (*S. microadriaticum : B. minutum*) and (B) symbiont density (cells/recruit) for the combined recruits are shown for each filter along the x-axis. The mean (points) and range (bars) of data are shown. Combinations were based on similarity in the relative ratio of symbionts as measured by qPCR; host and symbiont tissue combinations were maintained to generate host and symbiont filter pairs. 
+
+
+```{r fig2ab filterplot, include=TRUE, echo=TRUE, warning=FALSE, message= FALSE}
+ggplot(byfilter)+
+  geom_pointrange(aes(x=Filter,y=avgTotal,ymin=minTotal,ymax=maxTotal,color=avgB))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        axis.text.x=element_blank())+
+  scale_color_gradientn(colours=rev(wes_palette("Zissou1")),name="Symbiont Ratio (%B.m.)")+
+  scale_y_continuous(labels = scales::comma)+
+  xlab("Filter")+
+  ylab("Symbiont density (cells/recruit)")
+
+ggplot(byfilter)+
+  geom_pointrange(aes(x=Filter,y=avgB,ymin=minB,ymax=maxB,color=avgTotal))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        axis.text.x=element_blank())+
+  scale_color_gradientn(colours=c("#D8B70A", "#02401B"), labels = scales::comma,name="Symbiont density")+
+  scale_y_continuous(labels = scales::comma)+
+  xlab("Filter")+
+  ylab("Symbiont Ratio (Prop of B.m.)")
+```
+
+
+## Stable Isotope Analysis  
+
+## AP^13^C in Host Tissues  
+
+### Multiple linear regression of AP^13^C(host) ~ symbiont density X symbiont ratio
+
+
+```{r host13C, include=TRUE, echo=TRUE}
+lmHostAPC<-lm(HostAP_C~PercentB+CellsPerPolyp,data=realdata)
+summary(lmHostAPC)
+res<-resid(lmHostAPC)
+qqnorm(res)
+qqline(res)
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page 
+plot(lmHostAPC)
+```
+
+
+### **Fig. 3ab.** Atom percent ^13^C values for host tissues based on symbiont ratios (the relative ratio of *S. microadriaticum* and *B. minutum* symbionts, top) and symbiont densities (total cells per recruit, bottom).  
+#### Solid black lines show significant relationships as determined by generalized linear models. In the case of an interactive effect, the primary response is divided into levels of the secondary response variable, then modeled and plotted independently for each level with non-significant (triangles and dashed lines) and significant (circles and solid line) effects. 
+
+
+```{r fig3ab, include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(realdata,aes(x=PercentB,y=HostAP_C,color=CellsPerPolyp))+
+  geom_point(size=2.5)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+   geom_smooth(method="lm", colour="black", se = F)+
+   scale_color_gradientn(colours=c("#D8B70A", "#02401B"), labels = scales::comma,name="Symbiont density")+
+  xlab("Symbiont Ratio (Percent B.m.)")+
+  ylab("AP 13C in Host Tissue")
+
+ggplot(realdata,aes(x=CellsPerPolyp,y=HostAP_C,color=PercentB))+
+  geom_point(size=2.5)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  coord_cartesian(clip = "off") +
+   geom_smooth(method="lm", colour="black", se = F)+
+  scale_color_gradientn(colours=rev(wes_palette("Zissou1")),name="Symbiont Ratio (% B.m.)")+
+  scale_x_continuous(labels = scales::comma)+
+  xlab("Symbiont density (cells/recruit)")+
+  ylab("AP 13C in Host Tissue")
+```
+
+
+## AP^13^C in Symbiont Tissues  
+
+### Multiple linear regression of AP^13^C(sym) ~ symbiont density X symbiont ratio
+
+
+```{r sym13C, include=TRUE, echo=TRUE}
+lmSymAPC<-lm(SymAP_C~PercentB*CellsPerPolyp,data=realdata)
+summary(lmSymAPC)
+res<-resid(lmSymAPC)
+qqnorm(res)
+qqline(res)
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page 
+plot(lmSymAPC)
+
+##examine the effects of outlier removal
+realdata1<-filter(realdata,Filter!="145")
+realdata1<-filter(realdata1,Filter!="144")
+lmSymAPC1<-lm(SymAP_C~PercentB*CellsPerPolyp,data=realdata1)
+summary(lmSymAPC1)
+
+```
+
+
+### Marginal Effects Plot to visualize significant density x ratio interaction term on AP^13^C in symbiont tissues  
+
+###  **Fig.S2.**  
+#### The significant interaction effect of symbiont ratio and symbiont density on atom percent ^13^C values of symbiont tissues was examined by plotting the marginal effect of symbiont ratio (*S.m.:B.m.*) as moderated by symbiont density (cells/recruit).  
+
+
+```{r sym13C_ME, echo=TRUE, message=FALSE, warning=FALSE, results= FALSE}
+interflex(estimator = "linear",data = realdata , Y = "SymAP_C", D = "PercentB", X= "CellsPerPolyp",xlab = "Moderator: Symbiont density (cells/recruit)",ylab = "Marginal Effect of Symbiont Ratio on AP13Csym",theme.bw = TRUE,show.grid = FALSE,cex.axis = 0.7, cex.lab=0.7)
+
+#subset data according to marginal effects plots to visualize trends
+More7<-filter(realdata,CellsPerPolyp>=700000)
+notMore7<-filter(realdata,CellsPerPolyp<700000)
+```
+
+
+### **Fig. 3cd.** Atom percent ^13^C values for symbiont tissues based on symbiont ratios (the relative ratio of *S. microadriaticum* and *B. minutum* symbionts) and symbiont densities (total cells per recruits).  
+#### Solid black lines show significant relationships as determined by generalized linear models. In the case of an interactive effect, the primary response is divided into levels of the secondary response variable, then modeled and plotted independently for each level with non-significant (triangles and dashed lines) and significant (circles and solid line) effects. 
+
+
+```{r fig3cd, include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(More7,aes(x=PercentB,y=SymAP_C,color=CellsPerPolyp))+
+    geom_point(size=2.5)+ 
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        axis.text.x=element_blank())+
+  geom_smooth(method="lm", colour="black", se = F)+
+  geom_point(data=notMore7,size=2.5,shape=17)+
+  geom_smooth(data=notMore7,method="lm",color="gray",linetype="dashed", se =F)+
+  scale_color_gradientn(colours=c("#D8B70A", "#02401B"),name="Symbiont density")+
+  xlab("Percent B.m.")+
+  ylab("AP 13C in Symbiont Tissues")
+
+
+ggplot(realdata,aes(x=CellsPerPolyp,y=SymAP_C,color=PercentB))+
+  geom_point(size=2.5)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  scale_color_gradientn(colours=rev(wes_palette("Zissou1")),name="Symbiont Ratio (% B.m.)")+
+  scale_x_continuous(labels = scales::comma)+
+  xlab("Symbiont density (cells/recruit)")+
+  ylab("AP 13C in Symbiont Tissue")
+```
+
+
+## AP^15^N in Host Tissues  
+
+### Multiple linear regression of AP^15^N(host) ~ symbiont density X symbiont ratio
+
+
+```{r host15N, include=TRUE, echo=TRUE}
+
+lmHostAPN<-lm(HostAP_N~PercentB*CellsPerPolyp,data=realdata)
+summary(lmHostAPN)
+res<-resid(lmHostAPN)
+qqnorm(res)
+qqline(res)
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page 
+plot(lmHostAPN)
+
+```
+
+
+### Marginal Effects Plot to visualize significant density x ratio interaction term on AP^15^N in host tissues
+
+### **Fig. S3.**  
+#### The significant interaction effect of symbiont ratio and symbiont density on atom percent ^15^N values of host tissues was examined by plotting the marginal effect of symbiont density as moderated by symbiont ratio (*S.m.:B.m.*). 
+
+
+```{r host15N_ME, include=TRUE, message=FALSE, warning=FALSE, results= FALSE}
+
+interflex(estimator = "linear",data = realdata , Y = "HostAP_N", X = "PercentB", D= "CellsPerPolyp",treat.type = "continuous",nbins=7,xlab = "Moderator: Symbiont Ratio",ylab = "Marginal Effect of Sym Density on AP15Nhost",na.rm=T,theme.bw = TRUE,show.grid = FALSE,cex.axis = 0.7, cex.lab=0.7)
+
+less_B50<-filter(realdata,PercentB<=50)
+more_B50<-filter(realdata,PercentB>50)
+```
+
+
+### **Fig. 4. Atom percent ^15^N values for host tissues based on symbiont ratios (the relative ratio of *S.m.* and *B.m.* symbionts) and symbiont densities (total cells per recruit).**  
+#### Solid black lines show significant relationships as determined by generalized linear models. In the case of an interactive effect, the primary response is divided into levels of the secondary response variable, then modeled and plotted independently for levels of non-significant (triangles and dashed lines) and significant (circles and solid line) effects.
+
+
+```{r fig4ab, include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(realdata,aes(x=PercentB,y=HostAP_N,color=CellsPerPolyp))+
+  geom_point(size=2.5)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  scale_color_gradientn(colours=c("#D8B70A", "#02401B"), labels = scales::comma,name="Symbiont density")+
+  xlab("Symbiont Ratio (Percent B.m.)")+
+  ylab("AP 15N in Host Tissue")
+
+ggplot(less_B50,aes(x=CellsPerPolyp,y=HostAP_N,color=PercentB))+
+  geom_point(size=2.5)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  geom_smooth(method="lm", se = F,color="black")+
+  geom_point(data=more_B50,shape=17,size=2.5)+
+  geom_smooth(data=more_B50, method = "lm", se = F, color="gray",linetype="dashed")+
+  scale_color_gradientn(colours=rev(wes_palette("Zissou1")),name="Symbiont Ratio (% B.m.)")+
+  scale_x_continuous(labels = scales::comma)+
+  scale_y_continuous(limits=c(0.375,0.475))+
+  xlab("Symbiont density (cells/recruit)")+
+  ylab("AP 15N in Host Tissues")
+```
+
+
+## AP^15^N in Symbiont Tissues  
+
+### Multiple linear regression of AP^15^N(sym) ~ symbiont density X symbiont ratio  
+
+
+```{r sym15N, include=TRUE, echo=TRUE}
+
+lmSymAPN<-lm(SymAP_N~PercentB*CellsPerPolyp,data=realdata)
+summary(lmSymAPN)
+res<-resid(lmSymAPN)
+qqnorm(res)
+qqline(res)
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page 
+plot(lmSymAPN)
+
+```
+
+
+### Marginal Effects Plot to visualize significant density x ratio interaction term on AP^15^N in symbiont tissues  
+
+### **Fig. S4.**  
+#### The significant interaction effect of symbiont ratio and symbiont density on atom percent ^15^N values of symbiont tissues was examined by plotting the marginal effect of symbiont ratio (*S.m.:B.m.*) as moderated by symbiont density (cells/recruit).  
+
+### **Fig. S5.**  
+#### The significant interaction effect of symbiont ratio and symbiont density on atom percent ^15^N values of symbiont tissues was examined by plotting the marginal effect of symbiont density as moderated by symbiont ratio (*S.m.:B.m.*).  
+
+```{r sym15N_ME, include=TRUE, message=FALSE, warning=FALSE, results= FALSE}
+interflex(estimator = "linear",data = realdata , Y = "SymAP_N", X = "PercentB", D= "CellsPerPolyp",treat.type = "continuous",xlab = "Moderator: Symbiont Ratio",ylab = "Marginal Effect of Sym Density on AP15Nsym",na.rm=T,theme.bw = TRUE,show.grid = FALSE,cex.axis = 0.7, cex.lab=0.7,nbins=7)
+
+interflex(estimator = "linear",data = realdata , Y = "SymAP_N", D = "PercentB", X= "CellsPerPolyp",treat.type = "continuous",nbins=7,xlab = "Moderator: Symbiont Density",ylab = "Marginal Effect of Sym Ratio on AP15Nsym",na.rm=T,theme.bw = TRUE,show.grid = FALSE,cex.axis = 0.7, cex.lab=0.7)
+
+#subset data according to marginal effects plots to visualize trends
+More8<-filter(realdata,CellsPerPolyp>=800000)
+notMore8<-filter(realdata,CellsPerPolyp<800000)
+```
+
+
+### **Fig. 4.** Atom percent ^15^N values for symbiont tissues based on symbiont ratios (the relative ratio of *S.m.* and *B.m.* symbionts) and symbiont densities (total cells per recruit).   
+#### Solid black lines show significant relationships as determined by generalized linear models. In the case of an interactive effect, the primary response is divided into levels of the secondary response variable, then modeled and plotted independently for levels of non-significant (triangles and dashed lines) and significant (circles and solid line) effects.  
+
+
+```{r fig4cd, include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(notMore8,aes(x=PercentB,y=SymAP_N,color=CellsPerPolyp))+
+    geom_point(size=2.5)+ 
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        axis.text.x=element_blank())+
+  geom_smooth(method="lm", colour="black", se = F)+
+  geom_point(data=More8,size=2.5,shape=17)+
+  geom_smooth(data=More8,method="lm",color="gray",linetype="dashed", se =F)+
+  scale_color_gradientn(colours=c("#D8B70A", "#02401B"),name="Symbiont density")+
+  xlab("Percent B.m.")+
+  ylab("AP 15N in Symbiont Tissues")
+
+ggplot(less_B50,aes(x=CellsPerPolyp,y=SymAP_N,color=PercentB))+
+  geom_point(size=2.5)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  geom_smooth(method="lm", se = F,color="black")+
+  geom_point(data=more_B50,shape=17,size=2.5)+
+  geom_smooth(data=more_B50, method = "lm", se = F, color="gray",linetype="dashed")+
+  scale_color_gradientn(colours=rev(wes_palette("Zissou1")),name="Symbiont Ratio (% B.m.)")+
+  scale_x_continuous(labels = scales::comma)+
+  xlab("Symbiont density (cells/recruit)")+
+  ylab("AP 15N in Symbiont Tissues")
+```
+
+
+## Nutrient Sharing  
+
+### **Fig. 5.** Comparison of Host and Symbiont isotopic enrichment of ^13^C and ^15^N.   
+#### Red and blue lines show linear fit to data of recruits dominated by either *S. microadriaticum*, or *B. minutum* respectively. Dotted line shows a 1:1 relationship.  
+
+
+```{r fig5, include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(more_B50,aes(x=SymAP_N,y=HostAP_N,color=PercentB))+
+  geom_point(size=2.5)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+    geom_smooth(method="glm", colour="#3b9ab2", se = F, method.args = list(family="gaussian"))+ 
+  geom_point(data=less_B50,shape=17,size=2.5)+
+  geom_smooth(data=less_B50,method="glm", colour="#F21A00", se = F, method.args = list(family="gaussian"))+
+  geom_abline(slope=1,intercept=0,colour="gray",linetype="dashed")+
+  scale_color_gradientn(colours=rev(wes_palette("Zissou1")),name=element_blank())+
+  xlab("AP 15N in Sym Tissue")+
+  ylab("AP 15N in Host Tissue")
+
+```
+
+
+## Total New Nitrogen per Recruit  
+
+### Multiple linear regression combined Total N(new) per recruit ~ symbiont density X symbiont ratio  
+
+
+```{r combNewN, include=TRUE, echo=TRUE}
+
+lmNewN<-lm(CombNewNPolyp~PercentB*CellsPerPolyp,data=realdata)
+summary(lmNewN)
+res<-resid(lmNewN)
+qqnorm(res)
+qqline(res)
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page 
+plot(lmNewN)
+
+##examine the effects of outlier removal
+realdata1<-filter(realdata,Filter!="145")
+realdata1<-filter(realdata1,Filter!="144")
+
+lmNewN1<-lm(CombNewNPolyp~PercentB*CellsPerPolyp,data=realdata1)
+summary(lmNewN1)
+res<-resid(lmNewN1)
+qqnorm(res)
+qqline(res)
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page 
+plot(lmNewN1)
+
+```
+
+
+### Marginal Effects Plot to visualize significant density x ratio interaction term on Total New Nitrogen per Recruit  
+
+### **Fig. S6.**  
+#### The significant interaction effect of symbiont ratio and symbiont density on total assimilated nitrogen (mg/recruit) was examined by plotting the marginal effect of symbiont density as moderated by symbiont ratio (*S.m.:B.m.*).  
+
+
+```{r combNewN_ME, include=TRUE, message=FALSE, warning=FALSE, results= FALSE}
+interflex(estimator = "linear",data = realdata , Y = "CombNewNPolyp", X = "PercentB", D= "CellsPerPolyp",treat.type = "continuous",xlab = "Moderator: Symbiont Ratio",ylab = "Marginal Effect of Sym Density on Total New N",na.rm=T,theme.bw = TRUE,show.grid = FALSE,cex.axis = 0.7, cex.lab=0.7,nbins=7)
+```
+
+
+### **Fig. 6.** Total amount of newly assimilated nitrogen (mg) from combined host and symbiont tissues.  
+#### Solid black line shows significant relationship as determined by generalized linear models, with p-values. To visualize the significant interaction betwen symbiont density and symbiont ratio, data for symbiont ratios are plotted independently for levels of non-significant, <1:1, mostly *B. minutum* (triangles and dashed lines) and significant >1:1, mostly *S. microadriaticum* (circles and solid line) effects.  
+
+
+```{r fig6, include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(less_B50,aes(x=CellsPerPolyp,y=CombNewNPolyp,color=PercentB))+
+  geom_point(size=2.5)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  geom_smooth(method="lm", se = F,color="black")+
+  geom_point(data=more_B50,shape=17,size=2.5)+
+  geom_smooth(data=more_B50, method = "lm", se = F, color="gray",linetype="dashed")+
+  scale_color_gradientn(colours=rev(wes_palette("Zissou1")),name="Symbiont Ratio (% B.m.)")+
+  scale_x_continuous(labels = scales::comma)+
+  xlab("Symbiont density (cells/recruit)")+
+  ylab("Total Assimilated N (mg)/recruit")
+```
+
+
+#### END
