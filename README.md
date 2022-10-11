@@ -1,14 +1,12 @@
 # NutrientDynamics
-Data and code associated with publication "Nutrient dynamics in coral symbiosis are driven by both the relative and absolute abundance of symbiont species"
-
 
 This repository includes all data and analysis to accompany the manuscript:
 
-## Nutrient dynamics in coral symbiosis are driven by both the relative and absolute abundance of symbiont species
+## Nutrient dynamics in coral symbiosis depend on both the relative and absolute abundance of Symbiodiniaceae species.
 
 **Authors:** Shelby E. McIlroy, Casey terHorst, Mark Teece, Mary Alice Coffroth
 
-**Journal:** *Nature Ecology and Evolution (in review)*
+**Journal:** *Microbiome (2022)*
 Link: pending
 
 ### Repository contents:
