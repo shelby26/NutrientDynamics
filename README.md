@@ -6,8 +6,8 @@ This repository includes all data and analysis to accompany the manuscript:
 
 **Authors:** Shelby E. McIlroy, Casey terHorst, Mark Teece, Mary Alice Coffroth
 
-**Journal:** *Microbiome (2022)*
-Link: pending
+**Journal:** *Microbiome (2022) 10:192*
+Link: [Article](https://microbiomejournal.biomedcentral.com/articles/10.1186/s40168-022-01382-0)
 
 ### Repository contents:
 
